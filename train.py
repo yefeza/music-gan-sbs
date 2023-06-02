@@ -6,10 +6,11 @@ from base import WGAN
 import librosa
 import os
 import soundfile as sf
+# arguments command line   
+import argparse
 
 # Size of the samples inputs
 SAMPLE_SHAPE = (2, 4000)
-BATCH_SIZE = 8
 # Size of the noise vector
 NOISE_SHAPE = (1, 4000)
 
@@ -48,12 +49,6 @@ def get_generator_model():
     x = keras.layers.Reshape(NOISE_SHAPE)(x)
     g_model = keras.models.Model(noise, x, name="generator")
     return g_model
-
-d_model = get_discriminator_model()
-# d_model.summary()
-
-g_model = get_generator_model()
-g_model.summary()
 
 # Define the loss functions for the discriminator.
 def discriminator_loss(real_sample, fake_sample):
@@ -95,54 +90,68 @@ class GANMonitor(keras.callbacks.Callback):
             self.model.generator.save('data/models/generator_epoch_{}.h5'.format(epoch))
             self.model.discriminator.save('data/models/discriminator_epoch_{}.h5'.format(epoch))
 
-wgan = WGAN(
-    discriminator=d_model,
-    generator=g_model,
-    latent_dim=NOISE_SHAPE,
-    discriminator_extra_steps=1,
-)
+# main function
+def main():
+    # get arguments from command line
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--epochs', type=int, default=10, help='number of epochs to train the model')
+    parser.add_argument('--batch_size', type=int, default=8, help='batch size for training')
+    
+    args = parser.parse_args()
+    epochs = args.epochs
+    batch_size = args.batch_size
 
-# Compile the wgan model
-wgan.compile(
-    d_optimizer=keras.optimizers.Adam(learning_rate=0.0003, beta_1=0.5, beta_2=0.9),
-    g_optimizer=keras.optimizers.Adam(learning_rate=0.0003, beta_1=0.5, beta_2=0.9),
-    g_loss_fn=generator_loss,
-    d_loss_fn=discriminator_loss,
-)
+    d_model = get_discriminator_model()
+    d_model.summary()
+    g_model = get_generator_model()
+    g_model.summary()
 
-# Set the number of epochs for trainining.
-epochs = 10
+    wgan = WGAN(
+        discriminator=d_model,
+        generator=g_model,
+        latent_dim=NOISE_SHAPE,
+        discriminator_extra_steps=1,
+    )
+    # Compile the wgan model
+    wgan.compile(
+        d_optimizer=keras.optimizers.Adam(learning_rate=0.0003, beta_1=0.5, beta_2=0.9),
+        g_optimizer=keras.optimizers.Adam(learning_rate=0.0003, beta_1=0.5, beta_2=0.9),
+        g_loss_fn=generator_loss,
+        d_loss_fn=discriminator_loss,
+    )
+    # Load the dataset
+    input_samples = []
+    split_length = 4000
+    all_files=os.listdir('data/input')
+    for file in all_files:
+        sample_wav, sr = librosa.load('data/input/{}'.format(file))
+        resampled_wav = librosa.resample(sample_wav, orig_sr=sr, target_sr=4000)
+        # save resampled wav
+        # reshape from (4000,) to (4000, 1)
+        reshaped = resampled_wav.reshape(-1, 1)
+        sf.write('data/resampled{}.wav'.format(file), reshaped, 4000, 'PCM_24')
+        # insert a start sample at the beginning of the input samples with the same length as the other samples with zeros
+        input_samples.append(np.zeros(split_length))
+        # get array with split samples
+        for i in range(0, len(resampled_wav), split_length):
+            input_samples.append(resampled_wav[i:i+split_length])
+            # pad with zeros if the last sample is not the same length as the others
+            if len(input_samples[-1]) != split_length:
+                input_samples[-1] = np.pad(input_samples[-1], (0, split_length - len(input_samples[-1])), 'constant')
+        if len(input_samples) % 2 != 0:
+            input_samples = np.append(input_samples, np.zeros(split_length).reshape(1, split_length), axis=0)
+        input_samples=list(input_samples)
+    # group in samples of 2
+    input_samples = np.array(input_samples)
+    input_samples = input_samples.reshape((int(len(input_samples)/2), 2, split_length))
+    # convert to Tensor
+    input_samples = tf.convert_to_tensor(input_samples, dtype=tf.float32)
+    # make the inpiut samples a multiple of the batch size
+    input_samples = input_samples[:-(len(input_samples) % batch_size)]
+    print('input samples shape: {}'.format(input_samples.shape))
+    # train the model
+    cbk = GANMonitor(num_samples=11, latent_dim=NOISE_SHAPE)
+    wgan.fit(input_samples, batch_size=batch_size, epochs=epochs, callbacks=[cbk])
 
-# Load the dataset
-input_samples = []
-split_length = 4000
-all_files=os.listdir('data/input')
-for file in all_files:
-    sample_wav, sr = librosa.load('data/input/{}'.format(file))
-    resampled_wav = librosa.resample(sample_wav, orig_sr=sr, target_sr=4000)
-    # save resampled wav
-    # reshape from (4000,) to (4000, 1)
-    reshaped = resampled_wav.reshape(-1, 1)
-    sf.write('data/resampled{}.wav'.format(file), reshaped, 4000, 'PCM_24')
-    # insert a start sample at the beginning of the input samples with the same length as the other samples with zeros
-    input_samples.append(np.zeros(split_length))
-    # get array with split samples
-    for i in range(0, len(resampled_wav), split_length):
-        input_samples.append(resampled_wav[i:i+split_length])
-        # pad with zeros if the last sample is not the same length as the others
-        if len(input_samples[-1]) != split_length:
-            input_samples[-1] = np.pad(input_samples[-1], (0, split_length - len(input_samples[-1])), 'constant')
-    if len(input_samples) % 2 != 0:
-        input_samples = np.append(input_samples, np.zeros(split_length).reshape(1, split_length), axis=0)
-    input_samples=list(input_samples)
-# group in samples of 2
-input_samples = np.array(input_samples)
-input_samples = input_samples.reshape((int(len(input_samples)/2), 2, split_length))
-# convert to Tensor
-input_samples = tf.convert_to_tensor(input_samples, dtype=tf.float32)
-# make the inpiut samples a multiple of the batch size
-input_samples = input_samples[:-(len(input_samples) % BATCH_SIZE)]
-print('input samples shape: {}'.format(input_samples.shape))
-# train the model
-cbk = GANMonitor(num_samples=11, latent_dim=NOISE_SHAPE)
-wgan.fit(input_samples, batch_size=BATCH_SIZE, epochs=epochs, callbacks=[cbk])
+if __name__ == '__main__':
+    main()
