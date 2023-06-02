@@ -48,7 +48,6 @@ def get_generator_model():
     x = keras.layers.BatchNormalization()(x)
     x = keras.layers.Flatten()(x)
     x = keras.layers.Dropout(0.2)(x)
-    x = keras.layers.Dense(2000)(x)
     x = keras.layers.Dense(4000)(x)
     x = keras.layers.Activation("linear")(x)
     x = keras.layers.LayerNormalization()(x)
