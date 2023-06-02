@@ -70,49 +70,55 @@ class WGAN(keras.Model):
         for i in range(self.d_steps):
             # Get the latent vector
             random_latent_vectors = tf.random.normal(
-                shape=(batch_size, self.latent_dim[0], self.latent_dim[1])
+                shape=(1, self.latent_dim[0], self.latent_dim[1])
             )
-            with tf.GradientTape() as tape:
-                # Generate fake images from the latent vector
-                fake_samples = self.generator(random_latent_vectors, training=True)
-                # merge random_latent_noise with fake_samples to get shape (batch_size, 2, 4000)
-                fake_samples = tf.concat([random_latent_vectors, fake_samples], axis=1)
-                # Get the logits for the fake images
-                fake_logits = self.discriminator(fake_samples, training=True)
-                # Get the logits for the real images
-                real_logits = self.discriminator(real_samples, training=True)
+            for j in range(8):
+                with tf.GradientTape() as tape:
+                    # Generate fake images from the latent vector
+                    fake_samples = self.generator(random_latent_vectors, training=True)
+                    next_random_latent_vectors = fake_samples
+                    # merge random_latent_noise with fake_samples to get shape (batch_size, 2, 4000)
+                    fake_samples = tf.concat([random_latent_vectors, fake_samples], axis=1)
+                    # Get the logits for the fake images
+                    fake_logits = self.discriminator(fake_samples, training=True)
+                    # Get the logits for the real images
+                    mini_batch_real_samples = real_samples[j]
+                    mini_batch_real_samples = tf.reshape(mini_batch_real_samples, (1, 2, 4000))
+                    real_logits = self.discriminator(mini_batch_real_samples, training=True)
 
-                # Calculate the discriminator loss using the fake and real image logits
-                d_cost = self.d_loss_fn(real_sample=real_logits, fake_sample=fake_logits)
-                # Calculate the gradient penalty
-                gp = self.gradient_penalty(batch_size, real_samples, fake_samples)
-                # Add the gradient penalty to the original discriminator loss
-                d_loss = d_cost + gp * self.gp_weight
-
-            # Get the gradients w.r.t the discriminator loss
-            d_gradient = tape.gradient(d_loss, self.discriminator.trainable_variables)
-            # Update the weights of the discriminator using the discriminator optimizer
-            self.d_optimizer.apply_gradients(
-                zip(d_gradient, self.discriminator.trainable_variables)
-            )
+                    # Calculate the discriminator loss using the fake and real image logits
+                    d_cost = self.d_loss_fn(real_sample=real_logits, fake_sample=fake_logits)
+                    # Calculate the gradient penalty
+                    gp = self.gradient_penalty(batch_size, real_samples, fake_samples)
+                    # Add the gradient penalty to the original discriminator loss
+                    d_loss = d_cost + gp * self.gp_weight
+                    random_latent_vectors = next_random_latent_vectors
+                # Get the gradients w.r.t the discriminator loss
+                d_gradient = tape.gradient(d_loss, self.discriminator.trainable_variables)
+                # Update the weights of the discriminator using the discriminator optimizer
+                self.d_optimizer.apply_gradients(
+                    zip(d_gradient, self.discriminator.trainable_variables)
+                )
 
         # Train the generator
         # Get the latent vector
-        random_latent_vectors = tf.random.normal(shape=(batch_size, self.latent_dim[0], self.latent_dim[1]))
-        with tf.GradientTape() as tape:
-            # Generate fake images using the generator
-            generated_samples = self.generator(random_latent_vectors, training=True)
-            # merge random_latent_noise with fake_samples to get shape (batch_size, 2, 4000)
-            generated_samples = tf.concat([random_latent_vectors, generated_samples], axis=1)
-            # Get the discriminator logits for fake images
-            gen_samples_logits = self.discriminator(generated_samples, training=True)
-            # Calculate the generator loss
-            g_loss = self.g_loss_fn(gen_samples_logits)
-
-        # Get the gradients w.r.t the generator loss
-        gen_gradient = tape.gradient(g_loss, self.generator.trainable_variables)
-        # Update the weights of the generator using the generator optimizer
-        self.g_optimizer.apply_gradients(
-            zip(gen_gradient, self.generator.trainable_variables)
-        )
+        random_latent_vectors = tf.random.normal(shape=(1, self.latent_dim[0], self.latent_dim[1]))
+        for i in range(8):
+            with tf.GradientTape() as tape:
+                # Generate fake images using the generator
+                generated_samples = self.generator(random_latent_vectors, training=True)
+                next_random_latent_vectors = generated_samples
+                # merge random_latent_noise with fake_samples to get shape (batch_size, 2, 4000)
+                generated_samples = tf.concat([random_latent_vectors, generated_samples], axis=1)
+                # Get the discriminator logits for fake images
+                gen_samples_logits = self.discriminator(generated_samples, training=True)
+                # Calculate the generator loss
+                g_loss = self.g_loss_fn(gen_samples_logits)
+                random_latent_vectors = next_random_latent_vectors
+            # Get the gradients w.r.t the generator loss
+            gen_gradient = tape.gradient(g_loss, self.generator.trainable_variables)
+            # Update the weights of the generator using the generator optimizer
+            self.g_optimizer.apply_gradients(
+                zip(gen_gradient, self.generator.trainable_variables)
+            )
         return {"d_loss": d_loss, "g_loss": g_loss}

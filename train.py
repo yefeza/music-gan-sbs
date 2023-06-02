@@ -42,7 +42,9 @@ def get_generator_model():
     x = conv_block(x, 64, activation=keras.layers.LeakyReLU(0.2), strides=(1, 2))
     x = keras.layers.Flatten()(x)
     x = keras.layers.Dropout(0.2)(x)
-    x = keras.layers.Dense(np.prod(NOISE_SHAPE), activation="tanh")(x)
+    x = keras.layers.Dense(np.prod(NOISE_SHAPE))(x)
+    x = keras.layers.Activation("linear")(x)
+    x = keras.layers.LayerNormalization()(x)
     x = keras.layers.Reshape(NOISE_SHAPE)(x)
     g_model = keras.models.Model(noise, x, name="generator")
     return g_model
@@ -70,27 +72,34 @@ class GANMonitor(keras.callbacks.Callback):
         self.latent_dim = latent_dim
 
     def on_epoch_end(self, epoch, logs=None):
-        random_latent_vectors = tf.random.normal(shape=(self.num_samples, self.latent_dim[0], self.latent_dim[1]))
-        generated_samples = self.model.generator(random_latent_vectors)
-
+        random_latent_vectors = tf.random.normal(shape=(1, self.latent_dim[0], self.latent_dim[1]))
         sound_track = []
-        for i in range(self.num_samples):
-            sample = generated_samples[i].numpy()
+        for i in range(self.num_samples-1):
+            generated_samples = self.model.generator(random_latent_vectors)
+            sample = generated_samples[0].numpy()
             sound_track.append(sample[0])
+            random_latent_vectors = generated_samples
         # reshape the sound track to be a 1D array
         sound_track = np.array(sound_track).reshape(-1)
-        print(sound_track[:10])
         # create a directory for the generated samples
         if not os.path.exists('data/generated_samples'):
             os.makedirs('data/generated_samples', exist_ok=True)
+        # reshape from (4000,) to (4000, 1)
+        reshaped = sound_track.reshape(-1, 1)
         # save the generated samples as a wav file
-        sf.write('data/generated_samples/generated_samples_epoch_{}.wav'.format(epoch), sound_track, 4000)
+        sf.write('data/generated_samples/generated_samples_epoch_{}.wav'.format(epoch), reshaped, 4000, 'PCM_24')
+        # save the model on h5 format every 10 epochs and on the first epoch
+        if not os.path.exists('data/models'):
+            os.makedirs('data/models', exist_ok=True)
+        if (epoch+1) % 10 == 0 or epoch == 0:
+            self.model.generator.save('data/models/generator_epoch_{}.h5'.format(epoch))
+            self.model.discriminator.save('data/models/discriminator_epoch_{}.h5'.format(epoch))
 
 wgan = WGAN(
     discriminator=d_model,
     generator=g_model,
     latent_dim=NOISE_SHAPE,
-    discriminator_extra_steps=3,
+    discriminator_extra_steps=1,
 )
 
 # Compile the wgan model
@@ -102,30 +111,38 @@ wgan.compile(
 )
 
 # Set the number of epochs for trainining.
-epochs = 20
+epochs = 10
 
 # Load the dataset
-
-sample_wav = librosa.load('data/test.wav')[0]
-resampled_wav = librosa.resample(sample_wav, orig_sr=44100, target_sr=4000)
-
-# get array with split samples
-split_length = 4000
 input_samples = []
-for i in range(0, len(resampled_wav), split_length):
-    input_samples.append(resampled_wav[i:i+split_length])
-    # pad with zeros if the last sample is not the same length as the others
-    if len(input_samples[-1]) != split_length:
-        input_samples[-1] = np.pad(input_samples[-1], (0, split_length - len(input_samples[-1])), 'constant')
-# insert a start sample at the beginning of the input samples with the same length as the other samples with zeros
-input_samples = np.insert(input_samples, 0, np.zeros(split_length), axis=0)
+split_length = 4000
+all_files=os.listdir('data/input')
+for file in all_files:
+    sample_wav, sr = librosa.load('data/input/{}'.format(file))
+    resampled_wav = librosa.resample(sample_wav, orig_sr=sr, target_sr=4000)
+    # save resampled wav
+    # reshape from (4000,) to (4000, 1)
+    reshaped = resampled_wav.reshape(-1, 1)
+    sf.write('data/resampled{}.wav'.format(file), reshaped, 4000, 'PCM_24')
+    # insert a start sample at the beginning of the input samples with the same length as the other samples with zeros
+    input_samples.append(np.zeros(split_length))
+    # get array with split samples
+    for i in range(0, len(resampled_wav), split_length):
+        input_samples.append(resampled_wav[i:i+split_length])
+        # pad with zeros if the last sample is not the same length as the others
+        if len(input_samples[-1]) != split_length:
+            input_samples[-1] = np.pad(input_samples[-1], (0, split_length - len(input_samples[-1])), 'constant')
+    if len(input_samples) % 2 != 0:
+        input_samples = np.append(input_samples, np.zeros(split_length).reshape(1, split_length), axis=0)
+    input_samples=list(input_samples)
 # group in samples of 2
 input_samples = np.array(input_samples)
 input_samples = input_samples.reshape((int(len(input_samples)/2), 2, split_length))
 # convert to Tensor
 input_samples = tf.convert_to_tensor(input_samples, dtype=tf.float32)
-
+# make the inpiut samples a multiple of the batch size
+input_samples = input_samples[:-(len(input_samples) % BATCH_SIZE)]
+print('input samples shape: {}'.format(input_samples.shape))
 # train the model
-cbk = GANMonitor(num_samples=10, latent_dim=NOISE_SHAPE)
+cbk = GANMonitor(num_samples=11, latent_dim=NOISE_SHAPE)
 wgan.fit(input_samples, batch_size=BATCH_SIZE, epochs=epochs, callbacks=[cbk])
-
