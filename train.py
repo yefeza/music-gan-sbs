@@ -44,8 +44,6 @@ def get_generator_model():
     x = keras.layers.Conv2DTranspose(128, (2, 4), strides=(1, 2), padding="same")(x)
     x = keras.layers.BatchNormalization()(x)
     x = conv_block(x, 128, strides=(1, 2), activation=keras.layers.Activation("linear"), kernel_size=(2, 4))
-    x = keras.layers.Conv2DTranspose(128, (2, 4), strides=(1, 2), padding="same")(x)
-    x = keras.layers.BatchNormalization()(x)
     x = keras.layers.Conv2DTranspose(256, (2, 4), strides=(1, 2), padding="same")(x)
     x = keras.layers.BatchNormalization()(x)
     x = keras.layers.Flatten()(x)
