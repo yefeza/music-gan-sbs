@@ -64,11 +64,9 @@ def get_generator_model():
     # conv block
     x = keras.layers.Conv2D(2, (4, 4), strides=(8, 2), padding="same")(x)
     x = keras.layers.BatchNormalization()(x)
-    x = keras.layers.Dropout(0.2)(x)
     # conv block
     x = keras.layers.Conv2D(1, (28, 28), strides=(1, 1), padding="same")(x)
     x = keras.layers.BatchNormalization()(x)
-    x = keras.layers.Dropout(0.2)(x)
     # dense layer
     x = keras.layers.Flatten()(x)
     x = keras.layers.Dense(4000)(x)
