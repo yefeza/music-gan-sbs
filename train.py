@@ -37,23 +37,38 @@ def get_generator_model():
     noise = keras.layers.Input(shape=NOISE_SHAPE)
     x = keras.layers.Dense(4000)(noise)
     x = keras.layers.Reshape((2, 2000, 1))(x)
+    # deconv block
     x = keras.layers.Conv2DTranspose(256, (4, 4), strides=(1, 1), padding="same")(x)
     x = keras.layers.BatchNormalization()(x)
-    x = keras.layers.Activation("relu")(x)
+    x = keras.layers.Dropout(0.2)(x)
+    # x = keras.layers.Activation("relu")(x)
+    # deconv block
     x = keras.layers.Conv2DTranspose(128, (4, 4), strides=(2, 2), padding="same")(x)
     x = keras.layers.BatchNormalization()(x)
-    x = keras.layers.Activation("relu")(x)
+    # x = keras.layers.Activation("relu")(x)
+    # deconv block
     x = keras.layers.Conv2DTranspose(128, (4, 4), strides=(2, 2), padding="same")(x)
     x = keras.layers.BatchNormalization()(x)
-    x = keras.layers.Activation("relu")(x)
+    # x = keras.layers.Activation("relu")(x)
+    # deconv block
     x = keras.layers.Conv2DTranspose(64, (4, 4), strides=(2, 2), padding="same")(x)
     x = keras.layers.BatchNormalization()(x)
-    x = keras.layers.Activation("relu")(x)
+    # x = keras.layers.Activation("relu")(x)
+    # conv block
+    x = keras.layers.Conv2D(32, (4, 4), strides=(2, 2), padding="same")(x)
     x = keras.layers.BatchNormalization()(x)
-    x = keras.layers.Flatten()(x)
+    # conv block
+    x = keras.layers.Conv2D(2, (4, 4), strides=(8, 2), padding="same")(x)
+    x = keras.layers.BatchNormalization()(x)
     x = keras.layers.Dropout(0.2)(x)
-    x = keras.layers.Dense(np.prod(NOISE_SHAPE))(x)
-    x = keras.layers.Activation("linear")(x)
+    # conv block
+    x = keras.layers.Conv2D(1, (28, 28), strides=(1, 1), padding="same")(x)
+    x = keras.layers.BatchNormalization()(x)
+    x = keras.layers.Dropout(0.2)(x)
+    # dense layer
+    x = keras.layers.Flatten()(x)
+    x = keras.layers.Dense(4000)(x)
+    # output normalization
     x = keras.layers.LayerNormalization()(x)
     x = keras.layers.Reshape(NOISE_SHAPE)(x)
     g_model = keras.models.Model(noise, x, name="generator")
