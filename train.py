@@ -94,7 +94,7 @@ class GANMonitor(keras.callbacks.Callback):
         random_latent_vectors = tf.random.normal(shape=(1, self.latent_dim[0], self.latent_dim[1]))
         sound_track = []
         for i in range(self.num_samples-1):
-            generated_samples = self.model.generator(random_latent_vectors)
+            generated_samples = self.model.generator(random_latent_vectors, training=False)
             sample = generated_samples[0].numpy()
             sound_track.append(sample[0])
             random_latent_vectors = generated_samples
@@ -134,7 +134,7 @@ def main():
         discriminator=d_model,
         generator=g_model,
         latent_dim=NOISE_SHAPE,
-        discriminator_extra_steps=1,
+        discriminator_extra_steps=3,
     )
     # Compile the wgan model
     wgan.compile(
