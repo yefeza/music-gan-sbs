@@ -122,10 +122,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--epochs', type=int, default=10, help='number of epochs to train the model')
     parser.add_argument('--batch_size', type=int, default=8, help='batch size for training')
+    parser.add_argument('--d_extra_steps', type=int, default=3, help='number of discriminator extra steps')
     
     args = parser.parse_args()
     epochs = args.epochs
     batch_size = args.batch_size
+    d_extra_steps = args.d_extra_steps
 
     d_model = get_discriminator_model()
     d_model.summary()
@@ -136,7 +138,7 @@ def main():
         discriminator=d_model,
         generator=g_model,
         latent_dim=NOISE_SHAPE,
-        discriminator_extra_steps=3,
+        discriminator_extra_steps=d_extra_steps,
     )
     # Compile the wgan model
     wgan.compile(
