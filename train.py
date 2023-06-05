@@ -123,16 +123,25 @@ def main():
     parser.add_argument('--epochs', type=int, default=10, help='number of epochs to train the model')
     parser.add_argument('--batch_size', type=int, default=8, help='batch size for training')
     parser.add_argument('--d_extra_steps', type=int, default=3, help='number of discriminator extra steps')
-    
+    parser.add_argument('--load_model', type=bool, default=False, help='load model from h5 file')
+    parser.add_argument('--checkpoint', type=str, default=None, help='checkpoint file to load model from')
+
     args = parser.parse_args()
     epochs = args.epochs
     batch_size = args.batch_size
     d_extra_steps = args.d_extra_steps
+    load_model = args.load_model
+    checkpoint = args.checkpoint
 
     d_model = get_discriminator_model()
     d_model.summary()
     g_model = get_generator_model()
     g_model.summary()
+
+    if load_model:
+        g_model = keras.models.load_model('data/models/generator_epoch_{0}.h5'.format(checkpoint))
+        d_model = keras.models.load_model('data/models/discriminator_epoch_{0}.h5'.format(checkpoint))
+        print('loaded model from epoch {0}'.format(checkpoint))
 
     wgan = WGAN(
         discriminator=d_model,
