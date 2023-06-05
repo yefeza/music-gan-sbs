@@ -9,6 +9,7 @@ class WGAN(keras.Model):
         latent_dim,
         discriminator_extra_steps=3,
         gp_weight=10.0,
+        start_epoch=0,
     ):
         super().__init__()
         self.discriminator = discriminator

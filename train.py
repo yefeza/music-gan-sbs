@@ -88,11 +88,14 @@ def generator_loss(fake_sample):
 
 # Define the callback for saving generated samples during training.
 class GANMonitor(keras.callbacks.Callback):
-    def __init__(self, num_samples=10, latent_dim=NOISE_SHAPE):
+    def __init__(self, num_samples=10, latent_dim=NOISE_SHAPE, start_epoch=0):
         self.num_samples = num_samples
         self.latent_dim = latent_dim
+        self.start_epoch = start_epoch
 
     def on_epoch_end(self, epoch, logs=None):
+        epoch += self.start_epoch
+        epoch += 1
         random_latent_vectors = tf.random.normal(shape=(1, self.latent_dim[0], self.latent_dim[1]))
         sound_track = []
         for i in range(self.num_samples-1):
@@ -138,10 +141,12 @@ def main():
     g_model = get_generator_model()
     g_model.summary()
 
+    start_epoch = 0
     if load_model:
         g_model = keras.models.load_model('data/models/generator_epoch_{0}.h5'.format(checkpoint))
         d_model = keras.models.load_model('data/models/discriminator_epoch_{0}.h5'.format(checkpoint))
         print('loaded model from epoch {0}'.format(checkpoint))
+        start_epoch = int(checkpoint)
 
     wgan = WGAN(
         discriminator=d_model,
@@ -189,7 +194,7 @@ def main():
     input_samples = input_samples[:-(len(input_samples) % batch_size)]
     print('input samples shape: {}'.format(input_samples.shape))
     # train the model
-    cbk = GANMonitor(num_samples=11, latent_dim=NOISE_SHAPE)
+    cbk = GANMonitor(num_samples=11, latent_dim=NOISE_SHAPE, start_epoch=start_epoch)
     wgan.fit(input_samples, batch_size=batch_size, epochs=epochs, callbacks=[cbk])
 
 if __name__ == '__main__':
