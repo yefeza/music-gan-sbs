@@ -178,9 +178,11 @@ def main():
         if len(input_samples) % 2 != 0:
             input_samples = np.append(input_samples, np.zeros(split_length).reshape(1, split_length), axis=0)
         input_samples=list(input_samples)
-    # group in samples of 2
+    # make input samples as a list of 2
+    input_samples = [input_samples[i:i + 2] for i in range(len(input_samples) - 1)]
+    print(np.array(input_samples).shape)
+    # convert to numpy array
     input_samples = np.array(input_samples)
-    input_samples = input_samples.reshape((int(len(input_samples)/2), 2, split_length))
     # convert to Tensor
     input_samples = tf.convert_to_tensor(input_samples, dtype=tf.float32)
     # make the inpiut samples a multiple of the batch size
