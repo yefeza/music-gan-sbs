@@ -115,7 +115,7 @@ class GANMonitor(keras.callbacks.Callback):
         # save the model on h5 format every 10 epochs and on the first epoch
         if not os.path.exists('data/models'):
             os.makedirs('data/models', exist_ok=True)
-        if (epoch+1) % 10 == 0 or epoch == 0:
+        if epoch % 5 == 0:
             self.model.generator.save('data/models/generator_epoch_{}.h5'.format(epoch))
             self.model.discriminator.save('data/models/discriminator_epoch_{}.h5'.format(epoch))
 
