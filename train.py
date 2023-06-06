@@ -194,7 +194,7 @@ def main():
     input_samples = input_samples[:-(len(input_samples) % batch_size)]
     print('input samples shape: {}'.format(input_samples.shape))
     # train the model
-    cbk = GANMonitor(num_samples=11, latent_dim=NOISE_SHAPE, start_epoch=start_epoch)
+    cbk = GANMonitor(num_samples=31, latent_dim=NOISE_SHAPE, start_epoch=start_epoch)
     wgan.fit(input_samples, batch_size=batch_size, epochs=epochs, callbacks=[cbk])
 
 if __name__ == '__main__':
