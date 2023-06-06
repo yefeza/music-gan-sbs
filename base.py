@@ -9,7 +9,6 @@ class WGAN(keras.Model):
         latent_dim,
         discriminator_extra_steps=3,
         gp_weight=10.0,
-        start_epoch=0,
     ):
         super().__init__()
         self.discriminator = discriminator
@@ -73,20 +72,25 @@ class WGAN(keras.Model):
             random_latent_vectors = tf.random.normal(
                 shape=(1, self.latent_dim[0], self.latent_dim[1])
             )
+            historical_memory = tf.zeros(shape=(1, self.latent_dim[0], self.latent_dim[1]))
+            random_latent_vectors = tf.concat([random_latent_vectors, historical_memory], axis=1)
             for j in range(8):
                 with tf.GradientTape() as tape:
                     # Generate fake images from the latent vector
                     fake_samples = self.generator(random_latent_vectors, training=True)
                     next_random_latent_vectors = fake_samples
                     # merge random_latent_noise with fake_samples to get shape (batch_size, 2, 4000)
-                    fake_samples = tf.concat([random_latent_vectors, fake_samples], axis=1)
+                    first_sample = random_latent_vectors[:, 0, :]
+                    first_sample = tf.reshape(first_sample, (1, 1, 4000))
+                    second_sample = fake_samples[:, 0, :]
+                    second_sample = tf.reshape(second_sample, (1, 1, 4000))
+                    fake_samples = tf.concat([first_sample, second_sample], axis=1)
                     # Get the logits for the fake images
                     fake_logits = self.discriminator(fake_samples, training=True)
                     # Get the logits for the real images
                     mini_batch_real_samples = real_samples[j]
                     mini_batch_real_samples = tf.reshape(mini_batch_real_samples, (1, 2, 4000))
                     real_logits = self.discriminator(mini_batch_real_samples, training=True)
-
                     # Calculate the discriminator loss using the fake and real image logits
                     d_cost = self.d_loss_fn(real_sample=real_logits, fake_sample=fake_logits)
                     # Calculate the gradient penalty
@@ -104,13 +108,19 @@ class WGAN(keras.Model):
         # Train the generator
         # Get the latent vector
         random_latent_vectors = tf.random.normal(shape=(1, self.latent_dim[0], self.latent_dim[1]))
+        historical_memory = tf.zeros(shape=(1, self.latent_dim[0], self.latent_dim[1]))
+        random_latent_vectors = tf.concat([random_latent_vectors, historical_memory], axis=1)
         for i in range(8):
             with tf.GradientTape() as tape:
                 # Generate fake images using the generator
                 generated_samples = self.generator(random_latent_vectors, training=True)
                 next_random_latent_vectors = generated_samples
                 # merge random_latent_noise with fake_samples to get shape (batch_size, 2, 4000)
-                generated_samples = tf.concat([random_latent_vectors, generated_samples], axis=1)
+                first_sample = random_latent_vectors[:, 0, :]
+                first_sample = tf.reshape(first_sample, (1, 1, 4000))
+                second_sample = generated_samples[:, 0, :]
+                second_sample = tf.reshape(second_sample, (1, 1, 4000))
+                generated_samples = tf.concat([first_sample, second_sample], axis=1)
                 # Get the discriminator logits for fake images
                 gen_samples_logits = self.discriminator(generated_samples, training=True)
                 # Calculate the generator loss

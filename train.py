@@ -13,6 +13,8 @@ import argparse
 SAMPLE_SHAPE = (2, 4000)
 # Size of the noise vector
 NOISE_SHAPE = (1, 4000)
+# Size of the gen input vector
+GEN_INPUT_SHAPE = (2, 4000)
 
 def conv_block(x, filters, activation, kernel_size=(4, 4), strides=(2, 2)):
     x = keras.layers.Conv2D(filters, kernel_size, strides=strides, padding="same")(x)
@@ -39,9 +41,9 @@ def get_discriminator_model():
     return d_model
 
 def get_generator_model():
-    noise = keras.layers.Input(shape=NOISE_SHAPE)
+    noise = keras.layers.Input(shape=GEN_INPUT_SHAPE)
     x = keras.layers.Dense(4000)(noise)
-    x = keras.layers.Reshape((2, 2000, 1))(x)
+    x = keras.layers.Reshape((4, 2000, 1))(x)
     # deconv block
     x = keras.layers.Conv2DTranspose(256, (4, 4), strides=(1, 1), padding="same")(x)
     x = keras.layers.BatchNormalization()(x)
@@ -69,10 +71,10 @@ def get_generator_model():
     x = keras.layers.BatchNormalization()(x)
     # dense layer
     x = keras.layers.Flatten()(x)
-    x = keras.layers.Dense(4000)(x)
+    x = keras.layers.Dense(8000)(x)
     # output normalization
     x = keras.layers.LayerNormalization()(x)
-    x = keras.layers.Reshape(NOISE_SHAPE)(x)
+    x = keras.layers.Reshape(GEN_INPUT_SHAPE)(x)
     g_model = keras.models.Model(noise, x, name="generator")
     return g_model
 
@@ -97,10 +99,12 @@ class GANMonitor(keras.callbacks.Callback):
         epoch += self.start_epoch
         epoch += 1
         random_latent_vectors = tf.random.normal(shape=(1, self.latent_dim[0], self.latent_dim[1]))
+        historical_mem = tf.zeros(shape=(1, self.latent_dim[0], self.latent_dim[1]))
+        random_latent_vectors = tf.concat([random_latent_vectors, historical_mem], axis=1)
         sound_track = []
         for i in range(self.num_samples-1):
             generated_samples = self.model.generator(random_latent_vectors, training=False)
-            sample = generated_samples[0].numpy()
+            sample = generated_samples[0, :, :].numpy()
             sound_track.append(sample[0])
             random_latent_vectors = generated_samples
         # reshape the sound track to be a 1D array
