@@ -168,23 +168,24 @@ def main():
     split_length = 4000
     all_files=os.listdir(input_path)
     for file in all_files:
-        sample_wav, sr = librosa.load('data/input/{}'.format(file))
-        resampled_wav = librosa.resample(sample_wav, orig_sr=sr, target_sr=4000)
-        # save resampled wav
-        # reshape from (4000,) to (4000, 1)
-        reshaped = resampled_wav.reshape(-1, 1)
-        sf.write('data/resampled{}.wav'.format(file), reshaped, 4000, 'PCM_24')
-        # insert a start sample at the beginning of the input samples with the same length as the other samples with zeros
-        input_samples.append(np.zeros(split_length))
-        # get array with split samples
-        for i in range(0, len(resampled_wav), split_length):
-            input_samples.append(resampled_wav[i:i+split_length])
-            # pad with zeros if the last sample is not the same length as the others
-            if len(input_samples[-1]) != split_length:
-                input_samples[-1] = np.pad(input_samples[-1], (0, split_length - len(input_samples[-1])), 'constant')
-        if len(input_samples) % 2 != 0:
-            input_samples = np.append(input_samples, np.zeros(split_length).reshape(1, split_length), axis=0)
-        input_samples=list(input_samples)
+        if os.path.isfile(input_path+file):
+            sample_wav, sr = librosa.load(input_path+file, sr=None)
+            resampled_wav = librosa.resample(sample_wav, orig_sr=sr, target_sr=4000)
+            # save resampled wav
+            # reshape from (4000,) to (4000, 1)
+            reshaped = resampled_wav.reshape(-1, 1)
+            sf.write('data/resampled{}.wav'.format(file), reshaped, 4000, 'PCM_24')
+            # insert a start sample at the beginning of the input samples with the same length as the other samples with zeros
+            input_samples.append(np.zeros(split_length))
+            # get array with split samples
+            for i in range(0, len(resampled_wav), split_length):
+                input_samples.append(resampled_wav[i:i+split_length])
+                # pad with zeros if the last sample is not the same length as the others
+                if len(input_samples[-1]) != split_length:
+                    input_samples[-1] = np.pad(input_samples[-1], (0, split_length - len(input_samples[-1])), 'constant')
+            if len(input_samples) % 2 != 0:
+                input_samples = np.append(input_samples, np.zeros(split_length).reshape(1, split_length), axis=0)
+            input_samples=list(input_samples)
     # make input samples as a list of 2
     input_samples = [input_samples[i:i + 2] for i in range(len(input_samples) - 1)]
     print(np.array(input_samples).shape)
