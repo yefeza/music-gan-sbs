@@ -128,6 +128,7 @@ def main():
     parser.add_argument('--d_extra_steps', type=int, default=3, help='number of discriminator extra steps')
     parser.add_argument('--load_model', type=bool, default=False, help='load model from h5 file')
     parser.add_argument('--checkpoint', type=str, default=None, help='checkpoint file to load model from')
+    parser.add_argument('--input_path', type=str, default='data/input/', help='path to input data')
 
     args = parser.parse_args()
     epochs = args.epochs
@@ -135,6 +136,7 @@ def main():
     d_extra_steps = args.d_extra_steps
     load_model = args.load_model
     checkpoint = args.checkpoint
+    input_path = args.input_path
 
     d_model = get_discriminator_model()
     d_model.summary()
@@ -164,7 +166,7 @@ def main():
     # Load the dataset
     input_samples = []
     split_length = 4000
-    all_files=os.listdir('data/input')
+    all_files=os.listdir(input_path)
     for file in all_files:
         sample_wav, sr = librosa.load('data/input/{}'.format(file))
         resampled_wav = librosa.resample(sample_wav, orig_sr=sr, target_sr=4000)
