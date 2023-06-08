@@ -71,22 +71,22 @@ def get_generator_model():
     x = keras.layers.BatchNormalization()(x)
     # dense layer
     x = keras.layers.Flatten()(x)
-    x = keras.layers.Dense(8000)(x)
+    x = keras.layers.Dense(4000)(x)
     # output normalization
     x = keras.layers.LayerNormalization()(x)
-    x = keras.layers.Reshape(GEN_INPUT_SHAPE)(x)
+    x = keras.layers.Reshape(NOISE_SHAPE)(x)
     g_model = keras.models.Model(noise, x, name="generator")
     return g_model
 
 # Define the loss functions for the discriminator.
-def discriminator_loss(real_sample, fake_sample):
-    real_loss = tf.reduce_mean(real_sample)
-    fake_loss = tf.reduce_mean(fake_sample)
+def discriminator_loss(real_logits, fake_logits):
+    real_loss = tf.reduce_mean(real_logits)
+    fake_loss = tf.reduce_mean(fake_logits)
     return fake_loss - real_loss
 
 # Define the loss functions for the generator.
-def generator_loss(fake_sample):
-    return -tf.reduce_mean(fake_sample)
+def generator_loss(fake_logits):
+    return -tf.reduce_mean(fake_logits)
 
 # Define the callback for saving generated samples during training.
 class GANMonitor(keras.callbacks.Callback):
@@ -98,15 +98,15 @@ class GANMonitor(keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
         epoch += self.start_epoch
         epoch += 1
-        random_latent_vectors = tf.random.normal(shape=(1, self.latent_dim[0], self.latent_dim[1]))
         historical_mem = tf.zeros(shape=(1, self.latent_dim[0], self.latent_dim[1]))
-        random_latent_vectors = tf.concat([random_latent_vectors, historical_mem], axis=1)
         sound_track = []
         for i in range(self.num_samples-1):
+            random_latent_vectors = tf.random.normal(shape=(1, self.latent_dim[0], self.latent_dim[1]))
+            random_latent_vectors = tf.concat([historical_mem, random_latent_vectors], axis=1)
             generated_samples = self.model.generator(random_latent_vectors, training=False)
             sample = generated_samples[0, :, :].numpy()
             sound_track.append(sample[0])
-            random_latent_vectors = generated_samples
+            historical_mem = generated_samples
         # reshape the sound track to be a 1D array
         sound_track = np.array(sound_track).reshape(-1)
         # create a directory for the generated samples
