@@ -68,19 +68,23 @@ class WGAN(keras.Model):
         # one step of the generator. Here we will train it for 3 extra steps
         # as compared to 5 to reduce the training time.
         for i in range(self.d_steps):
+            # Get the latent vector
+            random_latent_vectors = tf.random.normal(
+                shape=(1, self.latent_dim[0], self.latent_dim[1])
+            )
             historical_memory = tf.zeros(shape=(1, self.latent_dim[0], self.latent_dim[1]))
+            random_latent_vectors = tf.concat([random_latent_vectors, historical_memory], axis=1)
             for j in range(8):
-                # Get the latent vector
-                random_latent_vectors = tf.random.normal(
-                    shape=(1, self.latent_dim[0], self.latent_dim[1])
-                )
-                random_latent_vectors = tf.concat([historical_memory, random_latent_vectors], axis=1)
                 with tf.GradientTape() as tape:
                     # Generate fake images from the latent vector
                     fake_samples = self.generator(random_latent_vectors, training=True)
-                    next_historical_memory = fake_samples
+                    next_random_latent_vectors = fake_samples
                     # merge random_latent_noise with fake_samples to get shape (batch_size, 2, 4000)
-                    fake_samples = tf.concat([historical_memory, fake_samples], axis=1)
+                    first_sample = random_latent_vectors[:, 0, :]
+                    first_sample = tf.reshape(first_sample, (1, 1, 4000))
+                    second_sample = fake_samples[:, 0, :]
+                    second_sample = tf.reshape(second_sample, (1, 1, 4000))
+                    fake_samples = tf.concat([first_sample, second_sample], axis=1)
                     # Get the logits for the fake images
                     fake_logits = self.discriminator(fake_samples, training=True)
                     # Get the logits for the real images
@@ -88,35 +92,40 @@ class WGAN(keras.Model):
                     mini_batch_real_samples = tf.reshape(mini_batch_real_samples, (1, 2, 4000))
                     real_logits = self.discriminator(mini_batch_real_samples, training=True)
                     # Calculate the discriminator loss using the fake and real image logits
-                    d_cost = self.d_loss_fn(real_logits=real_logits, fake_logits=fake_logits)
+                    d_cost = self.d_loss_fn(real_sample=real_logits, fake_sample=fake_logits)
                     # Calculate the gradient penalty
                     gp = self.gradient_penalty(1, mini_batch_real_samples, fake_samples)
                     # Add the gradient penalty to the original discriminator loss
                     d_loss = d_cost + gp * self.gp_weight
-                    historical_memory = next_historical_memory
+                    random_latent_vectors = next_random_latent_vectors
                 # Get the gradients w.r.t the discriminator loss
                 d_gradient = tape.gradient(d_loss, self.discriminator.trainable_variables)
                 # Update the weights of the discriminator using the discriminator optimizer
                 self.d_optimizer.apply_gradients(
                     zip(d_gradient, self.discriminator.trainable_variables)
                 )
+
         # Train the generator
         # Get the latent vector
+        random_latent_vectors = tf.random.normal(shape=(1, self.latent_dim[0], self.latent_dim[1]))
         historical_memory = tf.zeros(shape=(1, self.latent_dim[0], self.latent_dim[1]))
+        random_latent_vectors = tf.concat([random_latent_vectors, historical_memory], axis=1)
         for i in range(8):
-            random_latent_vectors = tf.random.normal(shape=(1, self.latent_dim[0], self.latent_dim[1]))
-            random_latent_vectors = tf.concat([historical_memory, random_latent_vectors], axis=1)
             with tf.GradientTape() as tape:
                 # Generate fake images using the generator
                 generated_samples = self.generator(random_latent_vectors, training=True)
-                next_historical_memory = generated_samples
+                next_random_latent_vectors = generated_samples
                 # merge random_latent_noise with fake_samples to get shape (batch_size, 2, 4000)
-                generated_samples = tf.concat([historical_memory, generated_samples], axis=1)
+                first_sample = random_latent_vectors[:, 0, :]
+                first_sample = tf.reshape(first_sample, (1, 1, 4000))
+                second_sample = generated_samples[:, 0, :]
+                second_sample = tf.reshape(second_sample, (1, 1, 4000))
+                generated_samples = tf.concat([first_sample, second_sample], axis=1)
                 # Get the discriminator logits for fake images
                 gen_samples_logits = self.discriminator(generated_samples, training=True)
                 # Calculate the generator loss
                 g_loss = self.g_loss_fn(gen_samples_logits)
-                historical_memory = next_historical_memory
+                random_latent_vectors = next_random_latent_vectors
             # Get the gradients w.r.t the generator loss
             gen_gradient = tape.gradient(g_loss, self.generator.trainable_variables)
             # Update the weights of the generator using the generator optimizer
